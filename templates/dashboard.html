@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cognitive.sh v2 — Brain-AI Symbiosis</title>
+  <style>
+    :root {
+      --bg: #070b14; --panel: #0f1623; --border: #1a2436; --text: #e2e8f0;
+      --muted: #8b9cb3; --accent: #22d3ee; --focus: #a78bfa; --load: #f472b6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace; background: var(--bg); color: var(--text); min-height: 100vh; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.3rem; border-bottom: 1px solid var(--border); background: #0a101c; flex-wrap: wrap; gap: 0.5rem; }
+    header h1 { font-size: 1.05rem; font-weight: 600; }
+    header h1 span { color: var(--accent); }
+    .pill { font-size: 0.7rem; padding: 0.2rem 0.65rem; border-radius: 999px; background: #064e3b; color: #6ee7b7; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; padding: 0.85rem 1.2rem 1.6rem; max-width: 1500px; margin: 0 auto; }
+    @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
+    .panel h2 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.6rem; }
+    .full { grid-column: 1 / -1; }
+    .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
+    @media (max-width: 700px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+    .metric { background: #0a101c; border-radius: 8px; padding: 0.6rem; text-align: center; }
+    .metric .val { font-size: 1.1rem; font-weight: 600; color: var(--accent); word-break: break-all; }
+    .metric .label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; margin-top: 0.12rem; }
+    .bar-wrap { margin: 0.35rem 0; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-bottom: 0.15rem; }
+    .bar { height: 6px; background: #1a2436; border-radius: 3px; overflow: hidden; }
+    .bar > div { height: 100%; border-radius: 3px; transition: width 0.4s; }
+    .bar.load > div { background: linear-gradient(90deg, #34d399, #f472b6); }
+    .bar.focus > div { background: linear-gradient(90deg, #22d3ee, #a78bfa); }
+    .bar.bw > div { background: linear-gradient(90deg, #818cf8, #22d3ee); }
+    .token, .mem { background: #0a101c; border-radius: 6px; padding: 0.4rem 0.55rem; margin-bottom: 0.3rem; font-size: 0.7rem; border-left: 3px solid var(--border); word-break: break-word; }
+    .token.critical { border-left-color: #f472b6; }
+    .token.high { border-left-color: #a78bfa; }
+    .token.normal { border-left-color: #22d3ee; }
+    .token.background { border-left-color: #475569; }
+    .mem .type { color: var(--focus); font-size: 0.6rem; text-transform: uppercase; }
+    .events { max-height: 220px; overflow-y: auto; font-size: 0.7rem; }
+    .event { padding: 0.28rem 0; border-bottom: 1px solid #141c2b; display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    .event .ts { color: var(--muted); min-width: 60px; }
+    .event .kind { min-width: 90px; color: var(--accent); }
+    .actions { display: flex; gap: 0.4rem; margin-bottom: 0.55rem; flex-wrap: wrap; align-items: center; }
+    button, input { background: #1a2436; border: 1px solid var(--border); color: var(--text); padding: 0.32rem 0.7rem; border-radius: 6px; font-family: inherit; font-size: 0.7rem; }
+    button { cursor: pointer; }
+    button:hover { background: #243044; }
+    button.primary { background: #0e7490; border-color: #0891b2; }
+    input { min-width: 140px; }
+    .auth-box { font-size: 0.7rem; color: var(--muted); }
+    .err { color: #f87171; font-size: 0.75rem; margin-top: 0.4rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>cognitive</span>.sh v2 — Brain-AI Symbiosis</h1>
+    <div class="pill" id="status">…</div>
+  </header>
+  <main>
+    <div class="panel full">
+      <h2>Auth</h2>
+      <div class="actions auth-box">
+        <input type="password" id="api-key" placeholder="API key (Bearer)" autocomplete="off" />
+        <button class="primary" type="button" onclick="saveKey()">Save key</button>
+        <span id="auth-hint">Required for /api/* when COG_REQUIRE_AUTH=true</span>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="panel full">
+      <h2>Symbiosis Metrics</h2>
+      <div class="metrics">
+        <div class="metric"><div class="val" id="m-mode">—</div><div class="label">Mode</div></div>
+        <div class="metric"><div class="val" id="m-load">—</div><div class="label">Load</div></div>
+        <div class="metric"><div class="val" id="m-focus">—</div><div class="label">Focus</div></div>
+        <div class="metric"><div class="val" id="m-wm">—</div><div class="label">Memory</div></div>
+        <div class="metric"><div class="val" id="m-ai">—</div><div class="label">AI Calls</div></div>
+      </div>
+      <div style="margin-top:0.7rem">
+        <div class="bar-wrap"><div class="bar-label"><span>Cognitive Load</span><span id="load-val">—</span></div><div class="bar load"><div id="load-bar" style="width:10%"></div></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>Focus</span><span id="focus-val">—</span></div><div class="bar focus"><div id="focus-bar" style="width:10%"></div></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>Bandwidth</span><span id="bw-val">—</span></div><div class="bar bw"><div id="bw-bar" style="width:10%"></div></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Selective Attention</h2>
+      <div style="font-size:0.75rem;margin-bottom:0.5rem">
+        <div><strong style="color:var(--accent)">Primary:</strong> <span id="att-primary">—</span></div>
+        <div style="margin-top:0.3rem"><strong style="color:var(--focus)">Secondary:</strong> <span id="att-secondary">—</span></div>
+        <div style="margin-top:0.3rem;color:var(--muted)"><strong>Suppressed:</strong> <span id="att-suppressed">—</span></div>
+      </div>
+      <h2 style="margin-top:0.8rem">Working Memory</h2>
+      <div id="working-mem"></div>
+    </div>
+    <div class="panel">
+      <h2>External Memory (persistent)</h2>
+      <div id="ext-mem"></div>
+    </div>
+    <div class="panel full">
+      <h2>Controls & Events</h2>
+      <div class="actions">
+        <button class="primary" type="button" onclick="setIntent('focus_narrow')">Focus</button>
+        <button type="button" onclick="setIntent('expand_idea')">Create</button>
+        <button type="button" onclick="setIntent('search_memory')">Recall</button>
+        <button type="button" onclick="setIntent('explore_related')">Explore</button>
+        <button type="button" onclick="recall('project goals')">Query Memory</button>
+        <button type="button" onclick="refresh()">Refresh</button>
+      </div>
+      <div class="events" id="events"></div>
+    </div>
+  </main>
+  <script>
+    /*INJECT_KEY*/
+    function esc(s) {
+      if (s == null) return "";
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+    function getKey() {
+      return localStorage.getItem("cog_api_key") || window.COG_API_KEY || document.getElementById("api-key").value || "";
+    }
+    function saveKey() {
+      const k = document.getElementById("api-key").value.trim();
+      if (k) localStorage.setItem("cog_api_key", k);
+      document.getElementById("err").textContent = k ? "Key saved locally" : "Cleared";
+      refresh();
+    }
+    async function api(path, opts) {
+      const headers = Object.assign({"Content-Type": "application/json"}, (opts && opts.headers) || {});
+      const key = getKey();
+      if (key) headers["Authorization"] = "Bearer " + key;
+      const r = await fetch(path, Object.assign({}, opts, {headers}));
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = {raw: text}; }
+      if (!r.ok) {
+        const msg = (data && data.error) || r.statusText || "error";
+        throw new Error(msg + (r.status === 401 ? " — set API key above" : ""));
+      }
+      return data;
+    }
+    function fmt(n, d) { return Number(n).toFixed(d == null ? 2 : d); }
+
+    async function refresh() {
+      const errEl = document.getElementById("err");
+      try {
+        // health is public
+        const health = await fetch("/health").then(r => r.json());
+        document.getElementById("status").textContent = health.auth_required ? "AUTH ON" : "ONLINE";
+
+        const s = await api("/api/v1/state");
+        errEl.textContent = "";
+        document.getElementById("m-mode").textContent = s.mode;
+        document.getElementById("m-load").textContent = fmt(s.cognitive_load);
+        document.getElementById("m-focus").textContent = fmt(s.focus_index);
+        document.getElementById("m-wm").textContent = s.working_memory_items + " / " + s.external_memory_items;
+        document.getElementById("m-ai").textContent = String(s.ai_calls_total);
+
+        document.getElementById("load-val").textContent = fmt(s.cognitive_load);
+        document.getElementById("load-bar").style.width = (s.cognitive_load * 100) + "%";
+        document.getElementById("focus-val").textContent = fmt(s.focus_index);
+        document.getElementById("focus-bar").style.width = (s.focus_index * 100) + "%";
+        const bw = s.attention ? s.attention.bandwidth_used : 0;
+        document.getElementById("bw-val").textContent = fmt(bw);
+        document.getElementById("bw-bar").style.width = (bw * 100) + "%";
+
+        if (s.attention) {
+          document.getElementById("att-primary").textContent = s.attention.primary || "—";
+          document.getElementById("att-secondary").textContent = (s.attention.secondary || []).join(" · ") || "—";
+          document.getElementById("att-suppressed").textContent = (s.attention.suppressed || []).slice(0, 4).join(" · ") || "—";
+        }
+
+        document.getElementById("working-mem").innerHTML = (s.working_memory || []).slice().reverse().map(function(t) {
+          return '<div class="token ' + esc(t.priority) + '"><strong>' + esc(t.priority) + '</strong> · ' + esc(t.content) +
+            ' <span style="color:var(--muted)">(sal ' + esc(fmt(t.salience)) + ')</span></div>';
+        }).join("") || "<div style='color:var(--muted);font-size:0.7rem'>Empty</div>";
+
+        document.getElementById("ext-mem").innerHTML = (s.external_memory || []).map(function(m) {
+          return '<div class="mem"><div class="type">' + esc(m.mem_type) + '</div>' + esc(m.content) +
+            '<div style="color:var(--muted);font-size:0.6rem;margin-top:0.15rem">str ' + esc(fmt(m.strength)) +
+            ' · access ' + esc(String(m.access_count)) + '</div></div>';
+        }).join("") || "<div style='color:var(--muted);font-size:0.7rem'>None</div>";
+
+        document.getElementById("events").innerHTML = (s.recent_events || []).slice().reverse().map(function(e) {
+          const ts = e.timestamp ? e.timestamp.slice(11, 19) : "";
+          return '<div class="event"><span class="ts">' + esc(ts) + '</span><span class="kind">' +
+            esc(e.kind) + '</span><span>' + esc(e.message) + '</span></div>';
+        }).join("") || "<div class='event'>No events</div>";
+      } catch (e) {
+        errEl.textContent = String(e.message || e);
+        document.getElementById("status").textContent = "ERROR";
+      }
+    }
+
+    async function setIntent(intent) {
+      try {
+        await api("/api/v1/intent", {method: "POST", body: JSON.stringify({intent: intent, call_ai: true})});
+        setTimeout(refresh, 250);
+      } catch (e) { document.getElementById("err").textContent = String(e.message || e); }
+    }
+    async function recall(q) {
+      try {
+        await api("/api/v1/recall", {method: "POST", body: JSON.stringify({query: q})});
+        setTimeout(refresh, 250);
+      } catch (e) { document.getElementById("err").textContent = String(e.message || e); }
+    }
+
+    (function init() {
+      const k = localStorage.getItem("cog_api_key");
+      if (k) document.getElementById("api-key").value = k;
+      refresh();
+      setInterval(refresh, 2000);
+    })();
+  </script>
+</body>
+</html>

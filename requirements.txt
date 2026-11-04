@@ -1,0 +1,2 @@
+# cognitive.sh v2 runtime is stdlib-only.
+# Optional: none required for simulator backends.

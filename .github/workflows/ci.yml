@@ -1,0 +1,45 @@
+name: CI
+on:
+  push: { branches: [main, master] }
+  pull_request: { branches: [main, master] }
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Compile
+        run: python -m compileall -q src/ tests/
+      - name: Unit & smoke tests
+        run: |
+          export PYTHONPATH=$PWD
+          python tests/test_smoke.py
+      - name: Adaptive vs baseline eval
+        run: |
+          export PYTHONPATH=$PWD
+          python -m src.cognitive.eval_harness
+      - name: Auth + API integration (subprocess)
+        run: |
+          export PYTHONPATH=$PWD
+          export COG_HOST=127.0.0.1
+          export COG_PORT=18100
+          export COG_REQUIRE_AUTH=true
+          export COG_API_KEY=ci-test-key-not-for-prod
+          export COG_DATA_DIR=$RUNNER_TEMP/cogdata
+          mkdir -p "$COG_DATA_DIR"
+          python -m src.cognitive.main &
+          PID=$!
+          trap "kill $PID" EXIT
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:18100/health && break
+            sleep 0.5
+          done
+          # unauthenticated API must fail
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18100/api/v1/state || true)
+          test "$code" = "401"
+          # authenticated must succeed
+          curl -sf -H "Authorization: Bearer ci-test-key-not-for-prod" http://127.0.0.1:18100/api/v1/state | grep -q mode
+          echo "API auth checks OK"

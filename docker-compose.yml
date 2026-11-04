@@ -1,0 +1,38 @@
+services:
+  cognitive:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: cognitive-symbiosis:2.0
+    container_name: cognitive-symbiosis
+    ports:
+      - "${COG_PORT:-8100}:8100"
+    environment:
+      COG_HOST: "0.0.0.0"
+      COG_PORT: "8100"
+      COG_REQUIRE_AUTH: "${COG_REQUIRE_AUTH:-true}"
+      COG_API_KEY: "${COG_API_KEY:-}"
+      COG_DATA_DIR: "/app/data"
+      COG_TICK_INTERVAL_SEC: "${COG_TICK_INTERVAL_SEC:-1.2}"
+      COG_CHANNELS: "${COG_CHANNELS:-1024}"
+      COG_NEURAL_BACKEND: "${COG_NEURAL_BACKEND:-simulator}"
+      COG_MODEL_BACKEND: "${COG_MODEL_BACKEND:-simulator}"
+      COG_MODEL_URL: "${COG_MODEL_URL:-}"
+      COG_MODEL_API_KEY: "${COG_MODEL_API_KEY:-}"
+    volumes:
+      - cog-data:/app/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 12s
+
+volumes:
+  cog-data:
